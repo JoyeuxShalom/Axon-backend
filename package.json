@@ -1,0 +1,40 @@
+{
+  "name": "axon-backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "nest build",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:prod": "node dist/main.js",
+    "start:mqtt": "node index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/config": "^4.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/jwt": "^11.0.0",
+    "@nestjs/passport": "^11.0.5",
+    "@nestjs/platform-express": "^11.0.0",
+    "@nestjs/swagger": "^11.4.1",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.4",
+    "firebase-admin": "^13.8.0",
+    "mqtt": "^5.15.1",
+    "passport": "^0.7.0",
+    "passport-custom": "^1.1.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "swagger-ui-express": "^5.0.1"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.0",
+    "@types/node": "^22.10.0",
+    "@types/passport": "^1.0.17",
+    "typescript": "^5.7.0"
+  }
+}
