@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { FirebaseService } from '../firebase/firebase.service';
 import { CreatePatientDto } from './dto/create-patient.dto';
+import { UpdateDeviceSettingsDto } from './dto/update-device-settings.dto';
 
 @Injectable()
 export class PatientService {
@@ -49,6 +50,56 @@ export class PatientService {
       return { message: `Device ${deviceId} assigned to patient ${patientId}` };
     } catch (error) {
       throw new InternalServerErrorException('Failed to assign device');
+    }
+  }
+
+  // ─── GET DEVICE INFO ───────────────────────────────────────
+  async getDeviceInfo(patientId: string) {
+    const db = this.firebase.getFirestore();
+    const doc = await db.collection('Users').doc(patientId).get();
+
+    if (!doc.exists) {
+      throw new NotFoundException(`Patient with ID ${patientId} not found`);
+    }
+
+    const data = doc.data() || {};
+    return {
+      deviceId: data.deviceId || null,
+      status: data.deviceId ? 'connected' : 'not_paired',
+      battery: data.deviceBattery || null,
+      lastSyncAt: data.lastSyncAt || null,
+      settings: data.deviceSettings || {
+        heartRateMonitor: true,
+        spo2Tracking: true,
+        sleepAnalysis: false,
+      },
+    };
+  }
+
+  // ─── UPDATE DEVICE SETTINGS ────────────────────────────────
+  async updateDeviceSettings(patientId: string, dto: UpdateDeviceSettingsDto) {
+    try {
+      const db = this.firebase.getFirestore();
+      const docRef = db.collection('Users').doc(patientId);
+      const doc = await docRef.get();
+
+      if (!doc.exists) {
+        throw new NotFoundException(`Patient with ID ${patientId} not found`);
+      }
+
+      // Build the nested settings update
+      const settingsUpdate: Record<string, any> = {};
+      if (dto.heartRateMonitor !== undefined) settingsUpdate['deviceSettings.heartRateMonitor'] = dto.heartRateMonitor;
+      if (dto.spo2Tracking !== undefined) settingsUpdate['deviceSettings.spo2Tracking'] = dto.spo2Tracking;
+      if (dto.sleepAnalysis !== undefined) settingsUpdate['deviceSettings.sleepAnalysis'] = dto.sleepAnalysis;
+      settingsUpdate['deviceSettings.updatedAt'] = new Date();
+
+      await docRef.update(settingsUpdate);
+
+      return { message: 'Device settings updated successfully' };
+    } catch (error: any) {
+      if (error instanceof NotFoundException) throw error;
+      throw new InternalServerErrorException('Failed to update device settings');
     }
   }
 }

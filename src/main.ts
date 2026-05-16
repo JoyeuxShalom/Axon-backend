@@ -7,6 +7,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
   app.enableCors();
+  app.setGlobalPrefix('api'); // All routes will now start with /api/
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
     forbidNonWhitelisted: true,
@@ -24,8 +25,9 @@ async function bootstrap() {
   // This hosts the documentation at http://localhost:3001/api/docs
   SwaggerModule.setup('api/docs', app, document);
 
-  await app.listen(3001);
-  console.log(`Axon Backend API running on http://localhost:3001`);
-  console.log(`API Documentation available at http://localhost:3001/api/docs`);
+  const port = process.env.PORT || 3001;
+  await app.listen(port, '0.0.0.0');
+  console.log(`Axon Backend API running on http://localhost:${port}`);
+  console.log(`API Documentation available at http://localhost:${port}/api/docs`);
 }
 bootstrap();

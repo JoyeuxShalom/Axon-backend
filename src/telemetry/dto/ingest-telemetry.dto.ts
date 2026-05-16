@@ -19,4 +19,10 @@ export class IngestTelemetryDto {
 
   @IsBoolean()
   fall_detected: boolean; // From the MPU6050
+
+  @IsNumber()
+  steps: number;
+
+  @IsNumber()
+  calories: number;
 }

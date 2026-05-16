@@ -24,7 +24,9 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.4",
     "firebase-admin": "^13.8.0",
+    "handlebars": "^4.7.9",
     "mqtt": "^5.15.1",
+    "nodemailer": "^8.0.7",
     "passport": "^0.7.0",
     "passport-custom": "^1.1.1",
     "reflect-metadata": "^0.2.2",
@@ -34,6 +36,7 @@
   "devDependencies": {
     "@nestjs/cli": "^11.0.0",
     "@types/node": "^22.10.0",
+    "@types/nodemailer": "^8.0.0",
     "@types/passport": "^1.0.17",
     "typescript": "^5.7.0"
   }

@@ -13,19 +13,42 @@ export class TelemetryService {
   ) {}
 
   async getPatientHistory(patientId: string, limit: number = 20) {
-    const db = this.firebase.getFirestore();
-    const snapshot = await db.collection('alerts')
-      .where('patient_uid', '==', patientId)
-      .orderBy('timestamp', 'desc')
-      .limit(limit)
-      .get();
+    try {
+      const db = this.firebase.getFirestore();
+      let query: any = db.collection('alerts')
+        .where('patient_uid', '==', patientId);
 
-    const history: any[] = [];
-    snapshot.forEach(doc => history.push({ id: doc.id, ...doc.data() }));
-    return history.reverse(); 
+      let snapshot;
+      try {
+        snapshot = await query.orderBy('timestamp', 'desc').limit(limit).get();
+      } catch (error) {
+        if (error.message?.includes('index')) {
+          console.warn('⚠️ Missing Index for Patient History. Using memory-sort fallback.');
+          snapshot = await query.limit(limit * 2).get();
+        } else throw error;
+      }
+
+      let history: any[] = [];
+      snapshot.forEach((doc: any) => history.push({ id: doc.id, ...doc.data() }));
+
+      // Manual sort if fallback occurred
+      if (!snapshot.query.hasOwnProperty('_queryOptions') || snapshot.query._queryOptions?.explicitOrderBy === false) {
+        history.sort((a, b) => {
+          const tA = a.timestamp?.toDate ? a.timestamp.toDate().getTime() : new Date(a.timestamp).getTime();
+          const tB = b.timestamp?.toDate ? b.timestamp.toDate().getTime() : new Date(b.timestamp).getTime();
+          return tB - tA;
+        });
+        history = history.slice(0, limit);
+      }
+
+      return history.reverse(); 
+    } catch (error) {
+      console.error('Error fetching patient history:', error);
+      throw error;
+    }
   }
 
-  // --- NEW: THE HARDWARE GATEWAY ---
+  // --- HARDWARE GATEWAY ---
   async processDeviceData(payload: IngestTelemetryDto) {
     const db = this.firebase.getFirestore();
 
@@ -59,20 +82,154 @@ export class TelemetryService {
         spo2: payload.spo2,
         systolic: payload.systolic,
         diastolic: payload.diastolic,
+        steps: payload.steps,
+        calories: payload.calories,
       }
     };
 
-    // If it's critical, save it as an Alert. If stable, maybe save to a 'history' log to save DB costs.
-    // For MVP, we will save everything to 'alerts' so the charts move.
     await db.collection('alerts').add(alertData);
 
-    // --- NEW: TRIGGER PUSH NOTIFICATION IF CRITICAL ---
+    // 4. Trigger push notification if critical
     if (analysis.is_critical) {
        const patientName = patientDoc.data().name || 'Patient';
-       // Fire and forget (no need to await, let it run in the background)
        this.notifications.sendCriticalAlert(patientId, patientName, analysis.risk_confidence);
     }
 
     return { success: true, risk_confidence: analysis.risk_confidence, action: analysis.status };
+  }
+
+  // ─── ALERTS: GET BY PATIENT (with filters) ─────────────────
+  async getAlertsByPatient(patientId: string, filters: { status?: string; severity?: string; limit?: number }) {
+    try {
+      const db = this.firebase.getFirestore();
+      let query: any = db.collection('alerts')
+        .where('patient_uid', '==', patientId);
+
+      if (filters.status) {
+        query = query.where('status', '==', filters.status.toUpperCase());
+      }
+
+      let snapshot;
+      const limit = filters.limit || 50;
+      try {
+        snapshot = await query.orderBy('timestamp', 'desc').limit(limit).get();
+      } catch (error) {
+        if (error.message?.includes('index')) {
+          console.warn('⚠️ Missing Index for Alerts Feed. Using memory-sort fallback.');
+          snapshot = await query.limit(limit * 2).get();
+        } else throw error;
+      }
+
+      let alerts: any[] = [];
+      snapshot.forEach((doc: any) => {
+        const data = doc.data();
+        let severity = 'low';
+        if (data.risk_confidence >= 0.7) severity = 'critical';
+        else if (data.risk_confidence >= 0.4) severity = 'medium';
+
+        alerts.push({ id: doc.id, severity, ...data });
+      });
+
+      // Manual sort if fallback occurred
+      if (!snapshot.query.hasOwnProperty('_queryOptions') || snapshot.query._queryOptions?.explicitOrderBy === false) {
+        alerts.sort((a, b) => {
+          const tA = a.timestamp?.toDate ? a.timestamp.toDate().getTime() : new Date(a.timestamp).getTime();
+          const tB = b.timestamp?.toDate ? b.timestamp.toDate().getTime() : new Date(b.timestamp).getTime();
+          return tB - tA;
+        });
+        alerts = alerts.slice(0, limit);
+      }
+
+      if (filters.severity) {
+        const sev = filters.severity.toLowerCase();
+        return alerts.filter(a => a.severity === sev);
+      }
+
+      return alerts;
+    } catch (error) {
+      console.error('Error fetching alerts:', error);
+      throw error;
+    }
+  }
+
+  // ─── ALERTS: GET SINGLE DETAIL ─────────────────────────────
+  async getAlertDetail(alertId: string) {
+    const db = this.firebase.getFirestore();
+    const doc = await db.collection('alerts').doc(alertId).get();
+
+    if (!doc.exists) {
+      throw new NotFoundException(`Alert with ID ${alertId} not found`);
+    }
+
+    const data = doc.data() || {};
+    let severity = 'low';
+    if (data.risk_confidence >= 0.7) severity = 'critical';
+    else if (data.risk_confidence >= 0.4) severity = 'medium';
+
+    return { id: doc.id, severity, ...data };
+  }
+
+  // ─── ALERTS: RESOLVE ───────────────────────────────────────
+  async resolveAlert(alertId: string, resolvedNote?: string) {
+    const db = this.firebase.getFirestore();
+    const docRef = db.collection('alerts').doc(alertId);
+    const doc = await docRef.get();
+
+    if (!doc.exists) {
+      throw new NotFoundException(`Alert with ID ${alertId} not found`);
+    }
+
+    const updateData: any = {
+      status: 'RESOLVED',
+      resolvedAt: new Date(),
+    };
+
+    if (resolvedNote) {
+      updateData.resolvedNote = resolvedNote;
+    }
+
+    await docRef.update(updateData);
+
+    return { message: `Alert ${alertId} resolved successfully` };
+  }
+
+  async getLatestTelemetry(patientId: string) {
+    const db = this.firebase.getFirestore();
+    try {
+      const snapshot = await db.collection('alerts')
+        .where('patient_uid', '==', patientId)
+        .orderBy('timestamp', 'desc')
+        .limit(1)
+        .get();
+
+      if (snapshot.empty) {
+        return { 
+          vitals_snapshot: { bpm: 0, spo2: 0, systolic: 0, diastolic: 0 },
+          risk_confidence: 0,
+          status: 'NO_DATA' 
+        };
+      }
+
+      return snapshot.docs[0].data();
+    } catch (error) {
+      if (error.message?.includes('index')) {
+        console.warn('⚠️ Missing Index for Latest Telemetry. Using memory-sort fallback.');
+        const snapshot = await db.collection('alerts')
+          .where('patient_uid', '==', patientId)
+          .limit(10) // Get a few and sort
+          .get();
+
+        if (snapshot.empty) return { vitals_snapshot: { bpm: 0, spo2: 0, systolic: 0, diastolic: 0 }, status: 'NO_DATA' };
+
+        const docs = snapshot.docs.map(d => d.data());
+        docs.sort((a, b) => {
+          const tA = a.timestamp?.toDate ? a.timestamp.toDate().getTime() : new Date(a.timestamp).getTime();
+          const tB = b.timestamp?.toDate ? b.timestamp.toDate().getTime() : new Date(b.timestamp).getTime();
+          return tB - tA;
+        });
+        return docs[0];
+      }
+      throw error;
+    }
   }
 }
