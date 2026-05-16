@@ -39,4 +39,12 @@ __decorate([
     (0, class_validator_1.IsBoolean)(),
     __metadata("design:type", Boolean)
 ], IngestTelemetryDto.prototype, "fall_detected", void 0);
+__decorate([
+    (0, class_validator_1.IsNumber)(),
+    __metadata("design:type", Number)
+], IngestTelemetryDto.prototype, "steps", void 0);
+__decorate([
+    (0, class_validator_1.IsNumber)(),
+    __metadata("design:type", Number)
+], IngestTelemetryDto.prototype, "calories", void 0);
 //# sourceMappingURL=ingest-telemetry.dto.js.map

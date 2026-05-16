@@ -7,6 +7,7 @@ const swagger_1 = require("@nestjs/swagger");
 async function bootstrap() {
     const app = await core_1.NestFactory.create(app_module_1.AppModule);
     app.enableCors();
+    app.setGlobalPrefix('api');
     app.useGlobalPipes(new common_1.ValidationPipe({
         whitelist: true,
         forbidNonWhitelisted: true,
@@ -19,9 +20,10 @@ async function bootstrap() {
         .build();
     const document = swagger_1.SwaggerModule.createDocument(app, config);
     swagger_1.SwaggerModule.setup('api/docs', app, document);
-    await app.listen(3001);
-    console.log(`Axon Backend API running on http://localhost:3001`);
-    console.log(`API Documentation available at http://localhost:3001/api/docs`);
+    const port = process.env.PORT || 3001;
+    await app.listen(port, '0.0.0.0');
+    console.log(`Axon Backend API running on http://localhost:${port}`);
+    console.log(`API Documentation available at http://localhost:${port}/api/docs`);
 }
 bootstrap();
 //# sourceMappingURL=main.js.map

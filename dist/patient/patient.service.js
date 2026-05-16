@@ -55,6 +55,50 @@ let PatientService = class PatientService {
             throw new common_1.InternalServerErrorException('Failed to assign device');
         }
     }
+    async getDeviceInfo(patientId) {
+        const db = this.firebase.getFirestore();
+        const doc = await db.collection('Users').doc(patientId).get();
+        if (!doc.exists) {
+            throw new common_1.NotFoundException(`Patient with ID ${patientId} not found`);
+        }
+        const data = doc.data() || {};
+        return {
+            deviceId: data.deviceId || null,
+            status: data.deviceId ? 'connected' : 'not_paired',
+            battery: data.deviceBattery || null,
+            lastSyncAt: data.lastSyncAt || null,
+            settings: data.deviceSettings || {
+                heartRateMonitor: true,
+                spo2Tracking: true,
+                sleepAnalysis: false,
+            },
+        };
+    }
+    async updateDeviceSettings(patientId, dto) {
+        try {
+            const db = this.firebase.getFirestore();
+            const docRef = db.collection('Users').doc(patientId);
+            const doc = await docRef.get();
+            if (!doc.exists) {
+                throw new common_1.NotFoundException(`Patient with ID ${patientId} not found`);
+            }
+            const settingsUpdate = {};
+            if (dto.heartRateMonitor !== undefined)
+                settingsUpdate['deviceSettings.heartRateMonitor'] = dto.heartRateMonitor;
+            if (dto.spo2Tracking !== undefined)
+                settingsUpdate['deviceSettings.spo2Tracking'] = dto.spo2Tracking;
+            if (dto.sleepAnalysis !== undefined)
+                settingsUpdate['deviceSettings.sleepAnalysis'] = dto.sleepAnalysis;
+            settingsUpdate['deviceSettings.updatedAt'] = new Date();
+            await docRef.update(settingsUpdate);
+            return { message: 'Device settings updated successfully' };
+        }
+        catch (error) {
+            if (error instanceof common_1.NotFoundException)
+                throw error;
+            throw new common_1.InternalServerErrorException('Failed to update device settings');
+        }
+    }
 };
 exports.PatientService = PatientService;
 exports.PatientService = PatientService = __decorate([

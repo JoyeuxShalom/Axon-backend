@@ -5,4 +5,6 @@ export declare class IngestTelemetryDto {
     systolic: number;
     diastolic: number;
     fall_detected: boolean;
+    steps: number;
+    calories: number;
 }

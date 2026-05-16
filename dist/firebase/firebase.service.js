@@ -46,8 +46,7 @@ let FirebaseService = class FirebaseService {
     onModuleInit() {
         const serviceAccount = require('../../firebase-service-account.json');
         this.defaultApp = admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount),
-            databaseURL: "https://<YOUR-PROJECT-ID>.firebaseio.com"
+            credential: admin.credential.cert(serviceAccount)
         });
         console.log('Firebase Admin SDK initialized successfully.');
     }

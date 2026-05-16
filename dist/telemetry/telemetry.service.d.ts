@@ -13,4 +13,17 @@ export declare class TelemetryService {
         risk_confidence: number;
         action: string;
     }>;
+    getAlertsByPatient(patientId: string, filters: {
+        status?: string;
+        severity?: string;
+        limit?: number;
+    }): Promise<any[]>;
+    getAlertDetail(alertId: string): Promise<{
+        id: string;
+        severity: string;
+    }>;
+    resolveAlert(alertId: string, resolvedNote?: string): Promise<{
+        message: string;
+    }>;
+    getLatestTelemetry(patientId: string): Promise<FirebaseFirestore.DocumentData>;
 }
